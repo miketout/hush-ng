@@ -102,11 +102,19 @@
 </el-popover>
 
       <el-button type="primary" @click="createTransaction">Create</el-button>
+
+
+ <el-tooltip class="item" effect="dark" content="Clear the transaction form" placement="top">
       <el-button type="danger" @click="clearTransaction(transactionForm,availableBalance)">Clear</el-button>
+</el-tooltip>
+
+
     </div>
     <div class="container" style="height:calc(100% - 300px);" >
       <el-row >
+ <el-tooltip effect="dark" content="Sent and received transactions" placement="top">
         <el-col :span="8" class="caption">Transaction History</el-col>
+</el-tooltip>
         <el-col :span="8" class="info" >click on a row to open block explorer</el-col>
         <el-col :span="8" class="balance"> 
           <div v-on:click="showFailedOperations" style="float:right;margin-left:10px;"> 
@@ -206,6 +214,10 @@
   const sprintf = require("sprintf-js").sprintf
   const Repeat = require('repeat')
   var store = require('store')
+  import { Popover, Tooltip } from 'element-ui';
+  import Vue from 'vue'
+  Vue.use(Popover);
+  Vue.use(Tooltip);
 
   export default {
     name: 'transactions',
@@ -246,11 +258,13 @@
         this.$electron.shell.openExternal(link)
       },
       clearTransaction (form,balance) {
-        form.amount      = "";
-        form.devDonation = "";
-        form.totalAmount = "";
-        form.remaining   = balance;
-        form.memo        = "";
+        form.from                 = "";
+        form.destinationAddresses = [];
+        form.amount               = "";
+        form.devDonation          = "";
+        form.totalAmount          = "";
+        form.remaining            = balance;
+        form.memo                 = "";
       },
       createTransaction () {
         this.$store.dispatch('sendToMany',this.transactionForm);
@@ -271,6 +285,22 @@
         form.remaining   = availableBalance - form.totalAmount;
         form.remaining   = sprintf("%.8f", form.remaining);
         form.totalAmount = sprintf("%.8f", form.amount + form.fee + parseFloat(form.devDonation));
+
+        var shieldedXtn = 0;
+      // Does this xtn contain at least one zaddr?
+      if (form.from && form.from.substr(0,1) == 'z' ) {
+        shieldedXtn = 1;
+      } else {
+        for(let receiver of form.destinationAddresses) {
+            var addr = receiver.toString();
+            if(addr.substr(0,1) == 'z') {
+                shieldedXtn = 1;
+                break;
+            }
+        }
+        // only shielded xtns have dev donations
+        form.devDonation = shieldedXtn ? form.devDonation : "Only shielded transactions contain donations";
+       }
       }
     },
     mounted: function() {

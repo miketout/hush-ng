@@ -25,7 +25,7 @@ Vue.use(Vuex)
 let vue = new Vue()
 
 // TODO: GUI option for this and read from config file!
-const privacy_mode       = 0;
+var privacy_mode       = 0;
 
 export default new Vuex.Store({
   modules: {
@@ -605,20 +605,36 @@ export default new Vuex.Store({
         return;
       }
 
+      // Does this xtn contain at least one zaddr?
+      var shieldedXtn = 0;
+      if (transactionForm.from.substr(0,1) == 'z' ) {
+        shieldedXtn = 1;
+      } else {
+        for(let receiver of transactionForm.destinationAddresses) {
+            var addr = receiver.toString();
+            if(addr.substr(0,1) == 'z') {
+                shieldedXtn = 1;
+                break;
+            }
+        }
+      }
+      console.log("shieldedXtn=" + shieldedXtn);
+
       // The default amount is *no value*, not zero. Avoid NaNs
       transactionForm.amount = transactionForm.amount ? parseFloat(transactionForm.amount) : '';
       var num_destinations   = transactionForm.destinationAddresses.length;
       var transaction_amount = transactionForm.amount * num_destinations;
-      // This is 1% of total amount being sent, ignoring network fee
-      // with a max of 10HUSH
-      var dev_fee            = 0.01 * transaction_amount;
+      // 1% of total amount being sent, ignoring network fee
+      // with a max of 10HUSH, only on transactions containing zaddrs
+      var dev_fee            = shieldedXtn ? 0.01 * transaction_amount : 0.0;
       if (dev_fee > 10.0) {
         dev_fee = 10.0; // maximum of 10 HUSH dev donation per xtn
       }
       console.log("transaction_amount="+transaction_amount+" dev_fee=" + dev_fee);
+
       //TODO: this forces all transactions to be z_sendmany
       // Should be, if no zaddrs, no donation/fee
-      var receivers          = [{
+      var receivers          = shieldedXtn ? [{
         // Wallet Support Fee, the maintenance of development of this wallet depends on this!!! :)
         // Thanks For Supporting Hush-NG!
 		"address": "zcU6yx5eUXqcDjeT5NJnhgEdVVrt2fCrdCGFGkWbNgcdq11XKUgsDjMErxUvnvFsSwAxXrGfaiqsY4L4gJ8RYmBfrEZvHLb",
@@ -626,7 +642,7 @@ export default new Vuex.Store({
 		"amount":  dev_fee,
         // Feel free to modify this to send your feedback, if you are mucking about in the code :)
 		"memo":    encodeMemo("Hush-NG Rocks!")
-	  }];
+	  }] : [ ];
 	  var memo         = transactionForm.memo;
 	  var encoded_memo = encodeMemo(memo);
       var network_fee  = parseFloat(transactionForm.fee);
@@ -704,8 +720,7 @@ export default new Vuex.Store({
 
       if (platform == "linux" || platform == "darwin") {                
         contactsFile = os.homedir() + "/hush-ng/contacts.json";
-      }
-      else if(platform == "win32") {
+      } else if(platform == "win32") {
         contactsFile = os.homedir() + "\\hush-ng\\contacts.json";
       }
 
